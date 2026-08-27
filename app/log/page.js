@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 import { awardBadge } from '@/lib/badges'
+import LocationPickerWrapper from '@/components/LocationPickerWrapper'
 
 const REGIONS = ['Pune', 'Nashik', 'Mumbai', 'Thane', 'Raigad', 'Ratnagiri', 'Satara', 'Kolhapur', 'Ahmednagar', 'Other']
 const DIFFICULTIES = ['easy', 'moderate', 'hard', 'expert']
@@ -33,6 +34,7 @@ export default function LogTrekPage() {
   // Trail search
   const [trailSearch, setTrailSearch] = useState('')
   const [trailResults, setTrailResults] = useState([])
+  const [popularTrails, setPopularTrails] = useState([])
   const [selectedTrail, setSelectedTrail] = useState(null)
   const [addingNew, setAddingNew] = useState(false)
 
@@ -56,7 +58,7 @@ export default function LogTrekPage() {
   const [gpsStatus, setGpsStatus] = useState('idle') // idle | checking | success | fail | error
   const [gpsCoords, setGpsCoords] = useState(null)
 
-  // ── Auth check ─────────────────────────────────────────────
+  // ── Auth check & Initial fetch ─────────────────────────────
   useEffect(() => {
     const supabase = createClient()
     supabaseRef.current = supabase
@@ -77,6 +79,15 @@ export default function LogTrekPage() {
       setHiker(data)
       setAuthLoading(false)
     })
+
+    // Fetch popular trails for empty state
+    supabase
+      .from('trails')
+      .select('id, name, region, difficulty, elevation_meters, is_fort')
+      .limit(6)
+      .then(({ data }) => {
+        if (data) setPopularTrails(data)
+      })
   }, [])
 
   // ── Trail search ────────────────────────────────────────────
@@ -305,6 +316,35 @@ export default function LogTrekPage() {
                   </button>
                 </div>
               )}
+
+              {/* Popular trails (shown when no search) */}
+              {!trailSearch.trim() && popularTrails.length > 0 && (
+                <div className="mt-6">
+                  <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">Popular Trails</div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {popularTrails.map(t => (
+                      <button
+                        key={t.id}
+                        type="button"
+                        onClick={() => setSelectedTrail(t)}
+                        className="text-left px-3 py-2 border border-stone-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
+                      >
+                        <div className="font-medium text-stone-800 text-sm">{t.is_fort ? '🏯' : '🥾'} {t.name}</div>
+                        <div className="text-stone-400 text-xs mt-0.5">{t.region} · {t.difficulty}</div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="mt-3 text-center">
+                    <button
+                      type="button"
+                      onClick={() => setAddingNew(true)}
+                      className="text-xs text-stone-400 hover:text-stone-600 underline"
+                    >
+                      Or add a new trail
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           ) : selectedTrail ? (
             <div className="flex items-center justify-between bg-green-50 rounded-lg px-4 py-3 border border-green-100">
@@ -333,18 +373,29 @@ export default function LogTrekPage() {
                 className="w-full px-4 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 required
               />
+              <div className="h-48 rounded-lg overflow-hidden border border-stone-200">
+                <LocationPickerWrapper
+                  onLocationSelect={(lat, lng) => {
+                    setNewTrail(n => ({
+                      ...n,
+                      latitude: lat.toFixed(5),
+                      longitude: lng.toFixed(5)
+                    }))
+                  }}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs text-stone-500 mb-1">Latitude *</label>
                   <input type="number" step="any" placeholder="e.g. 18.2463" value={newTrail.latitude}
                     onChange={e => setNewTrail(n => ({ ...n, latitude: e.target.value }))}
-                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600" required />
+                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-stone-50" required readOnly />
                 </div>
                 <div>
                   <label className="block text-xs text-stone-500 mb-1">Longitude *</label>
                   <input type="number" step="any" placeholder="e.g. 73.6826" value={newTrail.longitude}
                     onChange={e => setNewTrail(n => ({ ...n, longitude: e.target.value }))}
-                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600" required />
+                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-stone-50" required readOnly />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -371,7 +422,7 @@ export default function LogTrekPage() {
                   className="rounded border-stone-300 text-green-600 focus:ring-green-500" />
                 This is a fort / historical site
               </label>
-              <p className="text-xs text-stone-400">📍 Tip: find coordinates on Google Maps → right-click → "What's here?"</p>
+              <p className="text-xs text-stone-400">📍 Tip: Click anywhere on the map above to set the exact coordinates.</p>
             </div>
           )}
         </div>
