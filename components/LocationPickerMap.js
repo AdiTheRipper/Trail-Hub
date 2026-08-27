@@ -55,7 +55,7 @@ export default function LocationPickerMap({ onLocationSelect, lat, lng }) {
   const position = (lat && lng) ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null
 
   async function handleSearch(e) {
-    e.preventDefault()
+    if (e && e.preventDefault) e.preventDefault()
     if (!searchQuery.trim()) return
     
     setIsSearching(true)
@@ -80,22 +80,24 @@ export default function LocationPickerMap({ onLocationSelect, lat, lng }) {
     <div className="relative w-full h-full flex flex-col">
       {/* Search overlay (absolute so it sits on top of map tiles) */}
       <div className="absolute top-2 right-2 left-12 z-[400]">
-        <form onSubmit={handleSearch} className="flex gap-2">
+        <div className="flex gap-2">
           <input
             type="text"
             placeholder="Search map (e.g. Rajgad, Pune)..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSearch(e) }}
             className="flex-1 px-3 py-1.5 text-sm rounded border border-stone-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
           />
           <button 
-            type="submit" 
+            type="button" 
+            onClick={handleSearch}
             disabled={isSearching} 
             className="px-3 py-1.5 bg-white text-sm font-medium rounded border border-stone-300 shadow-sm hover:bg-stone-50 disabled:opacity-50 transition-colors"
           >
             {isSearching ? '...' : 'Search'}
           </button>
-        </form>
+        </div>
       </div>
 
       <MapContainer
