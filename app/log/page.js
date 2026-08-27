@@ -166,6 +166,10 @@ export default function LogTrekPage() {
 
       const isVerified = mode === 'live' && gpsStatus === 'success'
 
+      if (!hiker) {
+        throw new Error("Your hiker profile is missing (the database trigger may have failed during signup). Please recreate your account or contact support.")
+      }
+
       // 2. Insert trek log
       const { data: trekLog, error: trekError } = await supabase
         .from('trek_logs')
@@ -199,7 +203,8 @@ export default function LogTrekPage() {
       // 4. Redirect to success
       router.push(`/log/success?trail=${encodeURIComponent(trail.name)}&fort=${trail.is_fort}&verified=${isVerified}`)
     } catch (err) {
-      setError(err.message || 'Something went wrong. Please try again.')
+      console.error('Trek submission failed:', err)
+      setError(err.message || JSON.stringify(err) || 'Something went wrong. Please try again.')
       setSubmitting(false)
     }
   }

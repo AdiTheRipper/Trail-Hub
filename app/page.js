@@ -2,12 +2,10 @@ import Image from 'next/image'
 import Link from 'next/link'
 import TrailMapWrapper from '@/components/TrailMapWrapper'
 
-// Real Unsplash photos — Western Ghats / Sahyadri range
-// Free to use under Unsplash License (credit shown)
+// Local images for background and badges
 const HERO_PHOTO = {
-  id: '1506905925346-21bda4d32df4',
-  credit: 'Samuel Ferrara',
-  alt: 'Misty mountain peaks at sunrise',
+  src: '/hero-bg.jpg',
+  alt: 'Sahyadri mountain landscape',
 }
 
 const GALLERY = [
@@ -53,7 +51,7 @@ export default function LandingPage() {
 
         {/* Full-bleed background photo */}
         <Image
-          src={`https://images.unsplash.com/photo-${HERO_PHOTO.id}?w=1920&q=85&fit=crop`}
+          src={HERO_PHOTO.src}
           alt={HERO_PHOTO.alt}
           fill
           priority
@@ -94,11 +92,6 @@ export default function LandingPage() {
             </a>
           </div>
         </div>
-
-        {/* Photo credit */}
-        <p className="absolute bottom-4 right-4 z-10 text-white/50 text-xs">
-          Photo: {HERO_PHOTO.credit} / Unsplash
-        </p>
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 animate-bounce text-white/60">
@@ -210,26 +203,15 @@ export default function LandingPage() {
             Every trail has a unique AI-generated badge. Complete a trek — earn the badge.
             It's yours forever.
           </p>
-          <div className="flex flex-wrap justify-center gap-5">
-            {[
-              { emoji: '🏯', name: 'Rajgad Fort' },
-              { emoji: '⛰️', name: 'Harishchandragad' },
-              { emoji: '🌊', name: 'Kalu Waterfall' },
-              { emoji: '🦅', name: 'Kalsubai Peak' },
-              { emoji: '🌄', name: 'Torna Fort' },
-              { emoji: '🌿', name: 'Rajmachi' },
-            ].map((b, i) => (
-              <div key={i} className="flex flex-col items-center gap-2 group">
-                <div className="w-20 h-20 rounded-full bg-white/10 border border-white/20 flex items-center justify-center text-4xl group-hover:scale-110 group-hover:bg-white/20 transition-all cursor-default">
-                  {b.emoji}
-                </div>
-                <span className="text-xs text-stone-400">{b.name}</span>
-              </div>
-            ))}
+          <div className="relative w-full max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-2xl">
+            <Image
+              src="/badges-preview.jpg"
+              alt="Sahyadri Trek Badges"
+              width={1200}
+              height={600}
+              className="w-full h-auto object-cover"
+            />
           </div>
-          <p className="text-stone-500 text-xs mt-10">
-            Real badges are AI-generated artwork — unique per trail. Previews shown above are placeholders.
-          </p>
         </div>
       </section>
 
