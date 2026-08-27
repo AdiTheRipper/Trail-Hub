@@ -23,33 +23,92 @@ function makeIcon() {
   })
 }
 
-function ClickHandler({ onLocationSelect, position, setPosition }) {
-  useMapEvents({
+function MapController({ position, onLocationSelect }) {
+  const map = useMapEvents({
     click(e) {
-      setPosition(e.latlng)
       if (onLocationSelect) {
         onLocationSelect(e.latlng.lat, e.latlng.lng)
       }
     }
   })
-  return position ? <Marker position={position} icon={makeIcon()} /> : null
+
+  useEffect(() => {
+    if (position && !isNaN(position.lat) && !isNaN(position.lng)) {
+      // Smoothly pan map to new position without changing zoom unless fully zoomed out
+      map.flyTo([position.lat, position.lng], map.getZoom() < 10 ? 12 : map.getZoom(), {
+        animate: true,
+        duration: 0.5
+      })
+    }
+  }, [position, map])
+
+  return position && !isNaN(position.lat) && !isNaN(position.lng) ? (
+    <Marker position={position} icon={makeIcon()} />
+  ) : null
 }
 
-export default function LocationPickerMap({ onLocationSelect }) {
+export default function LocationPickerMap({ onLocationSelect, lat, lng }) {
   useEffect(() => fixLeafletIcons(), [])
-  const [position, setPosition] = useState(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearching, setIsSearching] = useState(false)
+
+  const position = (lat && lng) ? { lat: parseFloat(lat), lng: parseFloat(lng) } : null
+
+  async function handleSearch(e) {
+    e.preventDefault()
+    if (!searchQuery.trim()) return
+    
+    setIsSearching(true)
+    try {
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(searchQuery)}`)
+      const data = await res.json()
+      if (data && data.length > 0) {
+        const newLat = parseFloat(data[0].lat)
+        const newLng = parseFloat(data[0].lon)
+        if (onLocationSelect) onLocationSelect(newLat, newLng)
+      } else {
+        alert('Location not found')
+      }
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setIsSearching(false)
+    }
+  }
 
   return (
-    <MapContainer
-      center={[18.9, 73.6]} // Center roughly on Sahyadri
-      zoom={7}
-      style={{ height: '100%', width: '100%', zIndex: 10 }}
-    >
-      <TileLayer 
-        attribution='&copy; OpenStreetMap'
-        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
-      />
-      <ClickHandler onLocationSelect={onLocationSelect} position={position} setPosition={setPosition} />
-    </MapContainer>
+    <div className="relative w-full h-full flex flex-col">
+      {/* Search overlay (absolute so it sits on top of map tiles) */}
+      <div className="absolute top-2 right-2 left-12 z-[400]">
+        <form onSubmit={handleSearch} className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Search map (e.g. Rajgad, Pune)..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+            className="flex-1 px-3 py-1.5 text-sm rounded border border-stone-300 shadow-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-white"
+          />
+          <button 
+            type="submit" 
+            disabled={isSearching} 
+            className="px-3 py-1.5 bg-white text-sm font-medium rounded border border-stone-300 shadow-sm hover:bg-stone-50 disabled:opacity-50 transition-colors"
+          >
+            {isSearching ? '...' : 'Search'}
+          </button>
+        </form>
+      </div>
+
+      <MapContainer
+        center={[18.9, 73.6]} // Center roughly on Sahyadri
+        zoom={7}
+        style={{ flex: 1, width: '100%', zIndex: 10 }}
+      >
+        <TileLayer 
+          attribution='&copy; OpenStreetMap'
+          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" 
+        />
+        <MapController position={position} onLocationSelect={onLocationSelect} />
+      </MapContainer>
+    </div>
   )
 }

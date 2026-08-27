@@ -11,6 +11,6 @@ const LocationPickerMap = dynamic(() => import('@/components/LocationPickerMap')
   ),
 })
 
-export default function LocationPickerWrapper({ onLocationSelect }) {
-  return <LocationPickerMap onLocationSelect={onLocationSelect} />
+export default function LocationPickerWrapper(props) {
+  return <LocationPickerMap {...props} />
 }

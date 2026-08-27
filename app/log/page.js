@@ -375,6 +375,8 @@ export default function LogTrekPage() {
               />
               <div className="h-48 rounded-lg overflow-hidden border border-stone-200">
                 <LocationPickerWrapper
+                  lat={newTrail.latitude}
+                  lng={newTrail.longitude}
                   onLocationSelect={(lat, lng) => {
                     setNewTrail(n => ({
                       ...n,
@@ -389,13 +391,13 @@ export default function LogTrekPage() {
                   <label className="block text-xs text-stone-500 mb-1">Latitude *</label>
                   <input type="number" step="any" placeholder="e.g. 18.2463" value={newTrail.latitude}
                     onChange={e => setNewTrail(n => ({ ...n, latitude: e.target.value }))}
-                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-stone-50" required readOnly />
+                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600" required />
                 </div>
                 <div>
                   <label className="block text-xs text-stone-500 mb-1">Longitude *</label>
                   <input type="number" step="any" placeholder="e.g. 73.6826" value={newTrail.longitude}
                     onChange={e => setNewTrail(n => ({ ...n, longitude: e.target.value }))}
-                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600 bg-stone-50" required readOnly />
+                    className="w-full px-3 py-2 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600" required />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
