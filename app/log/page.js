@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import { awardBadge } from '@/lib/badges'
 import LocationPickerWrapper from '@/components/LocationPickerWrapper'
 
 const REGIONS = ['Pune', 'Nashik', 'Mumbai', 'Thane', 'Raigad', 'Ratnagiri', 'Satara', 'Kolhapur', 'Ahmednagar', 'Other']
@@ -16,6 +15,11 @@ const DIFFICULTY_LABEL = {
   expert: '🟣 Expert',
 }
 
+const LOG_TYPES = [
+  { key: 'trek', icon: '🥾', label: 'Trek / Climb', sub: 'Full hike, summit attempt' },
+  { key: 'trail_visit', icon: '🌿', label: 'Trail Visit', sub: 'Casual walk, day trip' },
+]
+
 export default function LogTrekPage() {
   const router = useRouter()
   const supabaseRef = useRef(null)
@@ -26,8 +30,8 @@ export default function LogTrekPage() {
   const [authLoading, setAuthLoading] = useState(true)
 
   // UI state
-  const [mode, setMode] = useState('memoir') // 'memoir' | 'live'
-  const [step, setStep] = useState(1) // 1 = trail, 2 = details, 3 = verify
+  const [logType, setLogType] = useState('trek')   // 'trek' | 'trail_visit'
+  const [mode, setMode] = useState('memoir')        // 'memoir' | 'live'
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -58,7 +62,7 @@ export default function LogTrekPage() {
   const [gpsStatus, setGpsStatus] = useState('idle') // idle | checking | success | fail | error
   const [gpsCoords, setGpsCoords] = useState(null)
 
-  // ── Auth check & Initial fetch ─────────────────────────────
+  // ── Auth check & initial data ────────────────────────────────
   useEffect(() => {
     const supabase = createClient()
     supabaseRef.current = supabase
@@ -80,17 +84,16 @@ export default function LogTrekPage() {
       setAuthLoading(false)
     })
 
-    // Fetch popular trails for empty state
-    supabase
+    // Prefetch popular trails
+    const supabase2 = createClient()
+    supabase2
       .from('trails')
       .select('id, name, region, difficulty, elevation_meters, is_fort')
-      .limit(6)
-      .then(({ data }) => {
-        if (data) setPopularTrails(data)
-      })
+      .limit(8)
+      .then(({ data }) => { if (data) setPopularTrails(data) })
   }, [])
 
-  // ── Trail search ────────────────────────────────────────────
+  // ── Trail search ─────────────────────────────────────────────
   useEffect(() => {
     if (!trailSearch.trim() || trailSearch.length < 2) {
       setTrailResults([])
@@ -111,7 +114,7 @@ export default function LogTrekPage() {
     return () => clearTimeout(timer)
   }, [trailSearch])
 
-  // ── GPS verification ────────────────────────────────────────
+  // ── GPS verification ─────────────────────────────────────────
   function verifyGps() {
     if (!selectedTrail) return
     setGpsStatus('checking')
@@ -121,7 +124,6 @@ export default function LogTrekPage() {
         const { latitude, longitude } = pos.coords
         setGpsCoords({ latitude, longitude })
 
-        // Haversine distance in metres
         const R = 6371000
         const dLat = ((selectedTrail.latitude - latitude) * Math.PI) / 180
         const dLon = ((selectedTrail.longitude - longitude) * Math.PI) / 180
@@ -131,14 +133,13 @@ export default function LogTrekPage() {
             Math.cos((selectedTrail.latitude * Math.PI) / 180) *
             Math.sin(dLon / 2) ** 2
         const distance = 2 * R * Math.asin(Math.sqrt(a))
-
         setGpsStatus(distance <= 500 ? 'success' : 'fail')
       },
       () => setGpsStatus('error')
     )
   }
 
-  // ── Create new community trail ──────────────────────────────
+  // ── Create new community trail ────────────────────────────────
   async function createTrail() {
     const supabase = supabaseRef.current
     const { data, error } = await supabase
@@ -160,29 +161,31 @@ export default function LogTrekPage() {
     return data
   }
 
-  // ── Submit trek ─────────────────────────────────────────────
+  // ── Submit ────────────────────────────────────────────────────
   async function handleSubmit(e) {
     e.preventDefault()
+    if (!selectedTrail && !addingNew) {
+      setError('Please select or add a trail first.')
+      return
+    }
     setSubmitting(true)
     setError('')
 
     try {
       const supabase = supabaseRef.current
 
-      // 1. Get or create trail
       let trail = selectedTrail
       if (addingNew) {
         trail = await createTrail()
       }
 
-      const isVerified = mode === 'live' && gpsStatus === 'success'
-
       if (!hiker) {
-        throw new Error("Your hiker profile is missing (the database trigger may have failed during signup). Please recreate your account or contact support.")
+        throw new Error('Your hiker profile is missing. Please sign out and sign up again.')
       }
 
-      // 2. Insert trek log
-      const { data: trekLog, error: trekError } = await supabase
+      const isVerified = mode === 'live' && gpsStatus === 'success'
+
+      const { error: trekError } = await supabase
         .from('trek_logs')
         .insert({
           hiker_id: hiker.id,
@@ -194,33 +197,20 @@ export default function LogTrekPage() {
           is_verified: isVerified,
           drive_folder_url: trekForm.drive_folder_url || null,
           google_photos_url: trekForm.google_photos_url || null,
+          log_type: logType,
         })
-        .select()
-        .single()
 
       if (trekError) throw trekError
 
-      // 3. Award badge
-      await awardBadge(
-        supabase,
-        hiker.id,
-        trekLog.id,
-        trail.id,
-        trail.name,
-        trail.is_fort,
-        isVerified
-      )
-
-      // 4. Redirect to success
-      router.push(`/log/success?trail=${encodeURIComponent(trail.name)}&fort=${trail.is_fort}&verified=${isVerified}`)
+      router.push(`/log/success?trail=${encodeURIComponent(trail.name)}&type=${logType}`)
     } catch (err) {
       console.error('Trek submission failed:', err)
-      setError(err.message || JSON.stringify(err) || 'Something went wrong. Please try again.')
+      setError(err.message || 'Something went wrong. Please try again.')
       setSubmitting(false)
     }
   }
 
-  // ── Loading / unauthed ──────────────────────────────────────
+  // ── Loading ──────────────────────────────────────────────────
   if (authLoading) {
     return (
       <div className="min-h-[80vh] flex items-center justify-center">
@@ -229,42 +219,64 @@ export default function LogTrekPage() {
     )
   }
 
-  // ── Render ──────────────────────────────────────────────────
+  // ── Render ───────────────────────────────────────────────────
   return (
     <div className="max-w-2xl mx-auto px-4 py-12">
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-stone-900 mb-2">Log a Trek</h1>
+        <h1 className="text-3xl font-bold text-stone-900 mb-2">Log an entry</h1>
         <p className="text-stone-500">
-          Completed a hike? Add it to your Sahyadri journey and earn your badge.
+          Add a trek or trail visit to your Sahyadri timeline.
         </p>
       </div>
 
-      {/* Mode toggle */}
-      <div className="flex rounded-xl overflow-hidden border border-stone-200 mb-8 bg-stone-50">
-        {[
-          { key: 'memoir', label: '📖 Memoir', sub: 'Past trek' },
-          { key: 'live', label: '📍 Live', sub: 'I\'m here now' },
-        ].map(m => (
+      {/* Log type toggle */}
+      <div className="flex rounded-xl overflow-hidden border border-stone-200 mb-4 bg-stone-50">
+        {LOG_TYPES.map(t => (
           <button
-            key={m.key}
-            onClick={() => setMode(m.key)}
+            key={t.key}
+            type="button"
+            onClick={() => setLogType(t.key)}
             className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
-              mode === m.key
+              logType === t.key
                 ? 'bg-white text-stone-900 shadow-sm'
                 : 'text-stone-500 hover:text-stone-700'
             }`}
           >
-            {m.label}
-            <span className="block text-xs font-normal text-stone-400">{m.sub}</span>
+            {t.icon} {t.label}
+            <span className="block text-xs font-normal text-stone-400">{t.sub}</span>
           </button>
         ))}
       </div>
 
+      {/* Memoir / Live toggle (only for treks) */}
+      {logType === 'trek' && (
+        <div className="flex rounded-xl overflow-hidden border border-stone-200 mb-8 bg-stone-50">
+          {[
+            { key: 'memoir', label: '📖 Memoir', sub: 'Past trek' },
+            { key: 'live', label: '📍 Live', sub: "I'm here now" },
+          ].map(m => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setMode(m.key)}
+              className={`flex-1 py-3 px-4 text-sm font-semibold transition-colors ${
+                mode === m.key
+                  ? 'bg-white text-stone-900 shadow-sm'
+                  : 'text-stone-500 hover:text-stone-700'
+              }`}
+            >
+              {m.label}
+              <span className="block text-xs font-normal text-stone-400">{m.sub}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
 
-        {/* ── TRAIL SELECTION ────────────────────────── */}
+        {/* ── TRAIL SELECTION ──────────────────────────── */}
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
           <h2 className="font-semibold text-stone-900 mb-4">1. Which trail?</h2>
 
@@ -287,7 +299,7 @@ export default function LogTrekPage() {
                 )}
               </div>
 
-              {/* Results */}
+              {/* Search results */}
               {trailResults.length > 0 && (
                 <div className="mt-2 rounded-lg border border-stone-100 overflow-hidden shadow-sm">
                   {trailResults.map(t => (
@@ -317,9 +329,9 @@ export default function LogTrekPage() {
                 </div>
               )}
 
-              {/* Popular trails (shown when no search) */}
+              {/* Popular trails */}
               {!trailSearch.trim() && popularTrails.length > 0 && (
-                <div className="mt-6">
+                <div className="mt-4">
                   <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider mb-2">Popular Trails</div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {popularTrails.map(t => (
@@ -327,10 +339,10 @@ export default function LogTrekPage() {
                         key={t.id}
                         type="button"
                         onClick={() => setSelectedTrail(t)}
-                        className="text-left px-3 py-2 border border-stone-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
+                        className="text-left px-3 py-2.5 border border-stone-200 rounded-lg hover:border-green-400 hover:bg-green-50 transition-colors"
                       >
                         <div className="font-medium text-stone-800 text-sm">{t.is_fort ? '🏯' : '🥾'} {t.name}</div>
-                        <div className="text-stone-400 text-xs mt-0.5">{t.region} · {t.difficulty}</div>
+                        <div className="text-stone-400 text-xs mt-0.5">{t.region} · {t.difficulty}{t.elevation_meters ? ` · ${t.elevation_meters}m` : ''}</div>
                       </button>
                     ))}
                   </div>
@@ -340,9 +352,18 @@ export default function LogTrekPage() {
                       onClick={() => setAddingNew(true)}
                       className="text-xs text-stone-400 hover:text-stone-600 underline"
                     >
-                      Or add a new trail
+                      Or add a new trail not listed here
                     </button>
                   </div>
+                </div>
+              )}
+
+              {!trailSearch.trim() && popularTrails.length === 0 && (
+                <div className="mt-4 text-center text-sm text-stone-400 py-4 border border-dashed border-stone-200 rounded-lg">
+                  Type to search, or{' '}
+                  <button type="button" onClick={() => setAddingNew(true)} className="text-green-700 underline">
+                    add a new trail
+                  </button>
                 </div>
               )}
             </>
@@ -350,13 +371,9 @@ export default function LogTrekPage() {
             <div className="flex items-center justify-between bg-green-50 rounded-lg px-4 py-3 border border-green-100">
               <div>
                 <div className="font-semibold text-stone-800">{selectedTrail.is_fort ? '🏯' : '🥾'} {selectedTrail.name}</div>
-                <div className="text-xs text-stone-500">{selectedTrail.region} · {selectedTrail.difficulty}</div>
+                <div className="text-xs text-stone-500">{selectedTrail.region} · {selectedTrail.difficulty}{selectedTrail.elevation_meters ? ` · ${selectedTrail.elevation_meters}m` : ''}</div>
               </div>
-              <button
-                type="button"
-                onClick={() => setSelectedTrail(null)}
-                className="text-xs text-stone-400 hover:text-stone-600"
-              >Change</button>
+              <button type="button" onClick={() => setSelectedTrail(null)} className="text-xs text-stone-400 hover:text-stone-600">Change</button>
             </div>
           ) : (
             /* New trail form */
@@ -373,7 +390,7 @@ export default function LogTrekPage() {
                 className="w-full px-4 py-2.5 border border-stone-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-green-600"
                 required
               />
-              <div className="h-48 rounded-lg overflow-hidden border border-stone-200">
+              <div className="h-52 rounded-lg overflow-hidden border border-stone-200">
                 <LocationPickerWrapper
                   lat={newTrail.latitude}
                   lng={newTrail.longitude}
@@ -424,20 +441,20 @@ export default function LogTrekPage() {
                   className="rounded border-stone-300 text-green-600 focus:ring-green-500" />
                 This is a fort / historical site
               </label>
-              <p className="text-xs text-stone-400">📍 Tip: Click anywhere on the map above to set the exact coordinates.</p>
+              <p className="text-xs text-stone-400">📍 Click on the map to set coordinates, or type them manually above.</p>
             </div>
           )}
         </div>
 
-        {/* ── TREK DETAILS ───────────────────────────── */}
+        {/* ── DETAILS ─────────────────────────────────────────── */}
         <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
-          <h2 className="font-semibold text-stone-900 mb-4">2. Trek details</h2>
-
+          <h2 className="font-semibold text-stone-900 mb-4">2. Details</h2>
           <div className="space-y-4">
+
             {/* Date */}
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                {mode === 'live' ? 'Today' : 'Date climbed'}
+                {mode === 'live' ? 'Today' : logType === 'trek' ? 'Date climbed' : 'Date visited'}
               </label>
               <input
                 type="date"
@@ -463,13 +480,17 @@ export default function LogTrekPage() {
                     }`}
                   >★</button>
                 ))}
+                {trekForm.rating > 0 && (
+                  <button type="button" onClick={() => setTrekForm(f => ({ ...f, rating: 0 }))}
+                    className="text-xs text-stone-400 hover:text-stone-600 self-center ml-1">clear</button>
+                )}
               </div>
             </div>
 
             {/* Conditions */}
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                Trail conditions <span className="text-stone-400 font-normal">(helps the community)</span>
+                Trail conditions <span className="text-stone-400 font-normal">(helps others)</span>
               </label>
               <textarea
                 value={trekForm.conditions_review}
@@ -483,7 +504,7 @@ export default function LogTrekPage() {
             {/* Story */}
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                Your story <span className="text-stone-400 font-normal">(optional memoir)</span>
+                Your story <span className="text-stone-400 font-normal">(optional)</span>
               </label>
               <textarea
                 value={trekForm.story}
@@ -497,7 +518,7 @@ export default function LogTrekPage() {
             {/* Photo links */}
             <div>
               <label className="block text-sm font-medium text-stone-700 mb-1.5">
-                📸 Google Drive folder link <span className="text-stone-400 font-normal">(optional)</span>
+                📸 Google Drive folder <span className="text-stone-400 font-normal">(optional)</span>
               </label>
               <input
                 type="url"
@@ -522,12 +543,12 @@ export default function LogTrekPage() {
           </div>
         </div>
 
-        {/* ── GPS VERIFICATION (live mode only) ──────── */}
-        {mode === 'live' && (
+        {/* ── GPS VERIFICATION (live trek only) ───────────────── */}
+        {logType === 'trek' && mode === 'live' && (
           <div className="bg-white rounded-2xl border border-stone-100 shadow-sm p-6">
             <h2 className="font-semibold text-stone-900 mb-2">3. Verify location</h2>
             <p className="text-stone-500 text-sm mb-4">
-              Get a ✅ Verified badge by confirming you're at the trailhead right now.
+              Confirm you're at the trailhead to get a ✅ Verified stamp on your timeline.
             </p>
 
             {gpsStatus === 'idle' && (
@@ -545,17 +566,17 @@ export default function LogTrekPage() {
             )}
             {gpsStatus === 'success' && (
               <div className="bg-green-50 border border-green-200 text-green-800 rounded-xl px-4 py-3 text-sm font-medium">
-                ✅ Location verified! You're at the trailhead. Verified badge unlocked.
+                ✅ Verified! You're at the trailhead.
               </div>
             )}
             {gpsStatus === 'fail' && (
               <div className="bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm">
-                📍 You're more than 500m from the trailhead. You'll get a Memoir badge instead. Still counts!
+                📍 You're more than 500m from the trailhead. Entry will be logged without verification.
               </div>
             )}
             {gpsStatus === 'error' && (
               <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm">
-                Location access denied. Enable GPS in your browser and try again, or skip for a Memoir badge.
+                Location access denied. Enable GPS in your browser to verify, or skip.
               </div>
             )}
           </div>
@@ -574,14 +595,12 @@ export default function LogTrekPage() {
           disabled={submitting || (!selectedTrail && !addingNew)}
           className="w-full py-4 bg-green-700 hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold rounded-xl transition-colors text-base shadow-lg shadow-green-900/20"
         >
-          {submitting ? 'Saving trek & generating badge…' : '🏅 Log trek & earn badge'}
+          {submitting
+            ? 'Saving…'
+            : logType === 'trek'
+              ? '🥾 Save trek to timeline'
+              : '🌿 Save trail visit to timeline'}
         </button>
-
-        <p className="text-center text-xs text-stone-400">
-          {mode === 'memoir'
-            ? '📖 Memoir badge (silver) — no GPS required'
-            : '✅ Verified badge (gold) if GPS confirms your location'}
-        </p>
       </form>
     </div>
   )
