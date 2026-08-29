@@ -49,9 +49,9 @@ export default function TrailsPage() {
 
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-stone-900 mb-2">Sahyadri Trails</h1>
+        <h1 className="text-3xl font-bold text-stone-900 mb-2">Explore Sahyadri</h1>
         <p className="text-stone-500">
-          {trails.length > 0 ? `${trails.length} trails and forts in the database` : 'Explore the trails of the Western Ghats'}
+          {trails.length > 0 ? `${trails.length} trails, forts and peaks in the database` : 'Explore the trails of the Western Ghats'}
         </p>
       </div>
 

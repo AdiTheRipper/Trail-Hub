@@ -179,10 +179,10 @@ export default function LandingPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {[
               { icon: '📓', title: 'Trek Memoir', desc: 'Log hikes from years ago. Build a complete personal history from your very first summit.' },
-              { icon: '🏅', title: 'AI Badges', desc: 'Unique AI-generated badge for every trail. Earned once, yours forever on your dashboard.' },
-              { icon: '📍', title: 'GPS Verification', desc: 'On location? Your browser verifies your GPS — get a Verified badge, no app download needed.' },
-              { icon: '🗺️', title: 'Trail Directory', desc: 'Forts and trails across Pune, Nashik, Konkan — the full Sahyadri range.' },
-              { icon: '📸', title: 'Photo Memories', desc: 'Link your Google Photos albums — we store the link, your photos stay with you.' },
+              { icon: '📅', title: 'Activity Timeline', desc: 'GitHub-style heatmap and year-grouped timeline. See every trek and trail visit at a glance.' },
+              { icon: '📍', title: 'GPS Verification', desc: 'On location? Your browser verifies your GPS — get a Verified stamp, no app download needed.' },
+              { icon: '🗺️', title: 'Explore Directory', desc: 'Forts and trails across Pune, Nashik, Konkan — the full Sahyadri range, searchable and filterable.' },
+              { icon: '📸', title: 'Photo Memories', desc: 'Link your Google Photos albums — we store the link, your photos stay in your own Google account.' },
               { icon: '🤝', title: 'Community Reports', desc: 'Real conditions from real hikers. Know trail status before you go.' },
             ].map(f => (
               <div key={f.title} className="bg-stone-50 rounded-2xl p-6 border border-stone-100 hover:border-stone-200 transition-colors">
@@ -191,26 +191,6 @@ export default function LandingPage() {
                 <p className="text-stone-500 text-sm leading-relaxed">{f.desc}</p>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── BADGE SHOWCASE ────────────────────────────────────── */}
-      <section className="py-20 px-4 bg-stone-900 text-white">
-        <div className="max-w-4xl mx-auto text-center">
-          <h2 className="text-3xl font-bold mb-3">Collect your Sahyadri badges</h2>
-          <p className="text-stone-400 mb-12 max-w-xl mx-auto">
-            Every trail has a unique AI-generated badge. Complete a trek — earn the badge.
-            It's yours forever.
-          </p>
-          <div className="relative w-full max-w-4xl mx-auto rounded-2xl overflow-hidden shadow-2xl">
-            <Image
-              src="/badges-preview.jpg"
-              alt="Sahyadri Trek Badges"
-              width={1200}
-              height={600}
-              className="w-full h-auto object-cover"
-            />
           </div>
         </div>
       </section>
@@ -233,8 +213,8 @@ export default function LandingPage() {
               {[
                 '✅ Any past date — go back years',
                 '📸 Link your Google Photos albums',
-                '🥈 Earn a Memoir badge (silver)',
-                '📅 Shows on your personal timeline',
+                '📅 Shows in your personal activity timeline',
+                '🗺️ Included in your stats and heatmap',
               ].map(item => (
                 <div key={item} className="text-sm text-stone-600">{item}</div>
               ))}
